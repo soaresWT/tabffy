@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #27272a transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #27272a;
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #3f3f46;
+}
+
+::selection {
+  background-color: rgba(20, 184, 166, 0.25);
+}
+
+.light {
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.light *::-webkit-scrollbar-thumb {
+  background-color: #d4d4d8;
+}
+
+.light *::-webkit-scrollbar-thumb:hover {
+  background-color: #a1a1aa;
+}
+
+.light ::selection {
+  background-color: rgba(20, 184, 166, 0.2);
+}
+
+.light .bg-zinc-950 {
+  background-color: #fafafa;
+}
+
+.light .bg-zinc-900 {
+  background-color: #f4f4f5;
+}
+
+.light .bg-zinc-900\/50,
+.light .bg-zinc-900\/80 {
+  background-color: rgb(244 244 245 / 0.5);
+}
+
+.light .bg-zinc-900\/60 {
+  background-color: rgb(244 244 245 / 0.6);
+}
+
+.light .bg-zinc-800\/50 {
+  background-color: rgb(228 228 231 / 0.5);
+}
+
+.light .bg-zinc-800\/60 {
+  background-color: rgb(228 228 231 / 0.6);
+}
+
+.light .bg-zinc-800\/30 {
+  background-color: rgb(228 228 231 / 0.3);
+}
+
+.light .bg-zinc-800 {
+  background-color: #e4e4e7;
+}
+
+.light .border-zinc-800\/60,
+.light .border-zinc-800\/80,
+.light .border-zinc-800\/40 {
+  border-color: rgb(212 212 216 / 0.6);
+}
+
+.light .border-zinc-800 {
+  border-color: #d4d4d8;
+}
+
+.light .text-zinc-100,
+.light .text-zinc-200 {
+  color: #18181b;
+}
+
+.light .text-zinc-300 {
+  color: #27272a;
+}
+
+.light .text-zinc-400 {
+  color: #3f3f46;
+}
+
+.light .text-zinc-500 {
+  color: #52525b;
+}
+
+.light .text-zinc-600 {
+  color: #71717a;
+}
+
+.light .text-zinc-700 {
+  color: #a1a1aa;
+}
+
+.light .text-zinc-800 {
+  color: #d4d4d8;
+}
+
+.light .hover\:text-zinc-300:hover {
+  color: #27272a;
+}
+
+.light .hover\:text-zinc-400:hover {
+  color: #3f3f46;
+}
+
+.light .hover\:bg-zinc-800\/50:hover {
+  background-color: rgb(228 228 231 / 0.5);
+}
+
+.light .hover\:bg-zinc-800\/30:hover {
+  background-color: rgb(228 228 231 / 0.3);
+}
+
+.light .hover\:bg-zinc-800\/60:hover {
+  background-color: rgb(228 228 231 / 0.6);
+}
+
+.light .bg-black\/60 {
+  background-color: rgb(0 0 0 / 0.3);
+}
+
+.light .fill-zinc-700 {
+  fill: #d4d4d8;
+}
+
+.light .bg-emerald-500\/10 {
+  background-color: rgb(16 185 129 / 0.1);
+}
+
+.light .shadow-black\/40 {
+  --tw-shadow-color: rgb(0 0 0 / 0.1);
+}
+
+.light .bg-teal-500\/10 {
+  background-color: rgb(20 184 166 / 0.08);
+}
+
+.light .border-teal-500\/20 {
+  border-color: rgb(20 184 166 / 0.2);
+}

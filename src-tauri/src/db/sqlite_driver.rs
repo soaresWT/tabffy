@@ -1,0 +1,179 @@
+use async_trait::async_trait;
+use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{Row, Column};
+
+use crate::models::{ColumnInfo, QueryResult, SchemaInfo, TableInfo};
+
+use super::driver::{DatabaseDriver, DriverError};
+use super::split::split_statements;
+
+fn sqlite_value_to_json(row: &sqlx::sqlite::SqliteRow, name: &str) -> serde_json::Value {
+    if let Ok(Some(v)) = row.try_get::<Option<i64>, _>(name) {
+        return v.into();
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<f64>, _>(name) {
+        return v.into();
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<String>, _>(name) {
+        return v.into();
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<bool>, _>(name) {
+        return v.into();
+    }
+    serde_json::Value::Null
+}
+
+#[derive(Clone)]
+pub struct SqliteDriver {
+    pool: sqlx::SqlitePool,
+}
+
+impl SqliteDriver {
+    pub async fn new(url: &str) -> Result<Self, DriverError> {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(2)
+            .connect(url)
+            .await
+            .map_err(|e| DriverError::Connection(e.to_string()))?;
+        Ok(Self { pool })
+    }
+
+    async fn execute_single(&self, sql: &str, limit: u32, offset: u32) -> Result<QueryResult, DriverError> {
+        let is_select = sql.trim_start().to_uppercase().starts_with("SELECT");
+
+        if is_select {
+            let wrapped = format!(
+                "SELECT * FROM ({}) AS _subq LIMIT {} OFFSET {}",
+                sql, limit, offset
+            );
+            let result = sqlx::query(&wrapped)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| DriverError::Query(e.to_string()))?;
+
+            let mut columns: Vec<String> = Vec::new();
+            if let Some(row) = result.first() {
+                columns = row
+                    .columns()
+                    .iter()
+                    .map(|c| c.name().to_string())
+                    .collect();
+            }
+
+            let rows = result
+                .iter()
+                .map(|row| {
+                    let mut map = serde_json::Map::new();
+                    for col in &columns {
+                        map.insert(col.clone(), sqlite_value_to_json(row, col));
+                    }
+                    map
+                })
+                .collect();
+
+            Ok(QueryResult {
+                columns,
+                rows,
+                rows_affected: None,
+            })
+        } else {
+            let result = sqlx::query(sql)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| DriverError::Query(e.to_string()))?;
+
+            Ok(QueryResult {
+                columns: vec![],
+                rows: vec![],
+                rows_affected: Some(result.rows_affected()),
+            })
+        }
+    }
+}
+
+#[async_trait]
+impl DatabaseDriver for SqliteDriver {
+    async fn test(&self) -> Result<(), DriverError> {
+        sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DriverError::Connection(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn list_schemas(&self) -> Result<Vec<SchemaInfo>, DriverError> {
+        Ok(vec![SchemaInfo {
+            name: "main".to_string(),
+        }])
+    }
+
+    async fn list_tables(&self, _schema: &str) -> Result<Vec<TableInfo>, DriverError> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DriverError::Query(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|(name,)| TableInfo {
+                name,
+                schema: "main".to_string(),
+            })
+            .collect())
+    }
+
+    async fn list_columns(&self, _schema: &str, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        let rows = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT name, type, CASE WHEN \"notnull\" = 0 THEN 'YES' ELSE 'NO' END FROM pragma_table_info(?) ORDER BY cid",
+        )
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DriverError::Query(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|(name, data_type, is_nullable)| ColumnInfo {
+                name,
+                table: table.to_string(),
+                schema: "main".to_string(),
+                data_type,
+                nullable: is_nullable == "YES",
+            })
+            .collect())
+    }
+
+    async fn execute_query(&self, sql: &str, limit: u32, offset: u32) -> Result<QueryResult, DriverError> {
+        let statements = split_statements(sql);
+
+        if statements.is_empty() {
+            return Ok(QueryResult {
+                columns: vec![],
+                rows: vec![],
+                rows_affected: Some(0),
+            });
+        }
+
+        if statements.len() == 1 {
+            return self.execute_single(&statements[0], limit, offset).await;
+        }
+
+        let mut total_rows_affected: u64 = 0;
+        let mut last_result: Option<QueryResult> = None;
+
+        for stmt in &statements {
+            let result = self.execute_single(stmt, limit, offset).await?;
+            total_rows_affected += result.rows_affected.unwrap_or(0);
+            last_result = Some(result);
+        }
+
+        let mut final_result = last_result.unwrap_or(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected: None,
+        });
+        final_result.rows_affected = Some(total_rows_affected);
+
+        Ok(final_result)
+    }
+}
